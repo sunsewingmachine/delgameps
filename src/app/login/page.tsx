@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /*
@@ -11,8 +11,70 @@ Handles authentication flow and navigation to home page upon successful login.
 export default function LoginPage() {
 	const router = useRouter();
 	const [phone, setPhone] = useState("");
+	const [referer, setReferer] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+
+	// Cookie utility functions
+	const setCookie = (name: string, value: string, days: number = 30) => {
+		const expires = new Date();
+		expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+		document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+	};
+
+	const getCookie = (name: string): string => {
+		const nameEQ = name + "=";
+		const ca = document.cookie.split(';');
+		for (let i = 0; i < ca.length; i++) {
+			let c = ca[i];
+			while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+			if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+		}
+		return "";
+	};
+
+	// Load saved values from cookies on component mount
+	useEffect(() => {
+		const savedPhone = getCookie('payskill_last_phone');
+		const savedReferer = getCookie('payskill_last_referer');
+		
+		if (savedPhone) {
+			setPhone(savedPhone);
+		}
+		if (savedReferer) {
+			setReferer(savedReferer);
+		}
+	}, []);
+
+	// Save values to cookies whenever they change
+	const handlePhoneChange = (value: string) => {
+		setPhone(value);
+		setCookie('payskill_last_phone', value);
+	};
+
+	const handleRefererChange = (value: string) => {
+		setReferer(value);
+		setCookie('payskill_last_referer', value);
+	};
+
+	const logAttempt = async (phone: string, referer: string, result: string, reason?: string) => {
+		try {
+			await fetch('/api/auth/attempts', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ 
+					phone: phone.trim(), 
+					referer: referer.trim(),
+					result,
+					reason
+				}),
+			});
+		} catch (error) {
+			console.error('Error logging attempt:', error);
+		}
+	};
 
 	const handleSubmit = async (e?: React.FormEvent) => {
 		e?.preventDefault();
@@ -23,7 +85,32 @@ export default function LoginPage() {
 			return;
 		}
 
+		if (!referer.trim()) {
+			setError("Please enter a referer code.");
+			return;
+		}
+
 		setLoading(true);
+
+		// Check if referer code is correct based on phone number
+		const phoneNumber = phone.trim();
+		const refererCode = referer.trim().toLowerCase();
+		let isValidReferer = false;
+
+		if (phoneNumber === "9842470497") {
+			// Special case: this phone number requires referer code '99'
+			isValidReferer = refererCode === "99";
+		} else {
+			// All other phone numbers require referer code 'far55'
+			isValidReferer = refererCode === "far55";
+		}
+
+		if (!isValidReferer) {
+			// Log failed attempt due to invalid referer
+			await logAttempt(phone, referer, 'failed', 'invalid_referer');
+			// Keep loading forever if referer is incorrect
+			return;
+		}
 
 		try {
 			const response = await fetch('/api/auth/login', {
@@ -37,6 +124,9 @@ export default function LoginPage() {
 			const data = await response.json();
 
 			if (data.success) {
+				// Log successful attempt
+				await logAttempt(phone, referer, 'success');
+				
 				// Store authentication data
 				localStorage.setItem("PaySkill-auth", "true");
 				localStorage.setItem("PaySkill-phone", data.user.phone);
@@ -45,13 +135,17 @@ export default function LoginPage() {
 				// Navigate to home page
 				router.push("/home");
 			} else {
-				setError(data.error || "Login failed. Please try again.");
+				// Log failed attempt due to unauthorized phone
+				await logAttempt(phone, referer, 'failed', 'unauthorized_phone');
+				// Keep loading forever if phone number is not in allowed list
+				return;
 			}
 		} catch (error) {
 			console.error('Login error:', error);
-			setError("Network error. Please check your connection and try again.");
-		} finally {
-			setLoading(false);
+			// Log failed attempt due to network error
+			await logAttempt(phone, referer, 'failed', 'network_error');
+			// Keep loading forever on network errors too
+			return;
 		}
 	};
 
@@ -70,14 +164,23 @@ export default function LoginPage() {
 					{/* Form section */}
 					<div className="px-8 pb-8">
 						<form onSubmit={handleSubmit} className="space-y-6">
-							<div className="space-y-2">
+							<div className="space-y-4">
 								<div className="relative">
 									<input
 										type="tel"
 										inputMode="tel"
 										value={phone}
-										onChange={(e) => setPhone(e.target.value)}
+										onChange={(e) => handlePhoneChange(e.target.value)}
 										placeholder="Enter your phone number"
+										className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
+									/>
+								</div>
+								<div className="relative">
+									<input
+										type="text"
+										value={referer}
+										onChange={(e) => handleRefererChange(e.target.value)}
+										placeholder="Enter referer code"
 										className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
 									/>
 								</div>

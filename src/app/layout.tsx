@@ -3,9 +3,9 @@ import React, { useState, useEffect } from "react";
 import "./globals.css";
 
 /*
-Purpose: Root layout for the PaySkill app. Provides the global full-screen structure
-(without a sidebar) and manages dark mode preferences. Ensures the app renders as an
-SPA without visible scrollbars by preventing overflow. (Under 100 words)
+Purpose: Root layout for the PaySkill app. Provides the global structure and manages 
+dark mode preferences. Allows natural scrolling behavior for content that exceeds 
+viewport height while maintaining elegant design and responsive layout.
 */
 
 export default function RootLayout({
@@ -68,10 +68,10 @@ export default function RootLayout({
 			<body
 				className={`antialiased h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 ${
 					darkMode ? "dark" : ""
-				} overflow-hidden`}>
-				<main className="h-full w-full overflow-hidden">
-					{/* Main app area: full-screen, single-page app, no visible scrollbars */}
-					<div className="h-full w-full overflow-hidden">{children}</div>
+				}`}>
+				<main className="h-full w-full">
+					{/* Main app area: scrollable content */}
+					<div className="h-full w-full">{children}</div>
 				</main>
 			</body>
 		</html>
