@@ -1,7 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import "./globals.css";
-import Sidebar from "../components/Sidebar";
+
+/*
+Purpose: Root layout for the PaySkill app. Provides the global full-screen structure
+(without a sidebar) and manages dark mode preferences. Ensures the app renders as an
+SPA without visible scrollbars by preventing overflow. (Under 100 words)
+*/
 
 export default function RootLayout({
 	children,
@@ -14,7 +19,7 @@ export default function RootLayout({
 		// Initialize dark mode based on system preference or saved preference
 		const savedTheme = localStorage.getItem("theme");
 		const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-		
+
 		if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
 			setDarkMode(true);
 			document.documentElement.classList.add("dark");
@@ -56,11 +61,18 @@ export default function RootLayout({
 
 	return (
 		<html lang="en" className="h-full">
-			<body className={`antialiased h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 ${darkMode ? "dark" : ""}`}>
-				<div className="flex h-full w-full">
-					<Sidebar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-					<main className="flex-1 p-8 bg-gray-50 dark:bg-gray-800 overflow-auto">{children}</main>
-				</div>
+			<head>
+				<title>PaySkill</title>
+				<meta name="viewport" content="width=device-width, initial-scale=1" />
+			</head>
+			<body
+				className={`antialiased h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 ${
+					darkMode ? "dark" : ""
+				} overflow-hidden`}>
+				<main className="h-full w-full overflow-hidden">
+					{/* Main app area: full-screen, single-page app, no visible scrollbars */}
+					<div className="h-full w-full overflow-hidden">{children}</div>
+				</main>
 			</body>
 		</html>
 	);

@@ -1,10 +1,18 @@
 "use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function About() {
-  return (
-    <div className="p-6">
-      <h1 className="text-3xl font-semibold mb-4">About Page</h1>
-      <p>This is the About page with some simple text content.</p>
-    </div>
-  );
+/*
+Purpose: Neutralized About page for PaySkill. Immediately redirects users to the login
+screen to keep the app focused on the splash/login/home flow. (Under 100 words)
+*/
+
+export default function AboutPage() {
+	const router = useRouter();
+
+	useEffect(() => {
+		router.replace("/login");
+	}, [router]);
+
+	return null;
 }
