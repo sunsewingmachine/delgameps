@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import jsQR from "jsqr";
 
 /*
 Purpose: QR Code Scanner page for PaySkill Task 2. Allows users to scan referrer's QR codes
@@ -101,60 +102,72 @@ export default function QRScannerPage() {
 
 			// Frame detection loop
 			const detectFrame = async () => {
-				if (!scanning) return;
+				if (!scanning || !videoRef.current || !canvasRef.current) return;
 
 				try {
-					// Try using native detector against the video element
-					if (detectorRef.current && videoRef.current) {
-						const detections = await detectorRef.current.detect(videoRef.current as any);
-						if (detections && detections.length > 0) {
-							const value = detections[0].rawValue ?? (detections[0] as any).rawData ?? '';
-							setScannedData(value);
-							setScanning(false);
+					const video = videoRef.current;
+					const canvas = canvasRef.current;
+					const ctx = canvas.getContext('2d');
 
-							if (value === TARGET_QR) {
-								alert('QR matched expected referrer code.');
-							} else {
-								alert(`Scanned QR: ${value}`);
-							}
+					// Wait for video to be ready
+					if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+						animationRef.current = requestAnimationFrame(detectFrame);
+						return;
+					}
 
-							stopScanner();
-							return;
-						}
-					} else if (canvasRef.current && videoRef.current) {
-						// Fallback: draw video frame to canvas and try to use window.jsQR if loaded
-						const video = videoRef.current;
-						const canvas = canvasRef.current;
-						const ctx = canvas.getContext('2d');
-						if (video.videoWidth && video.videoHeight && ctx) {
-							canvas.width = video.videoWidth;
-							canvas.height = video.videoHeight;
-							ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-							const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-							const jsQR = (window as any).jsQR;
-							if (jsQR) {
-								const code = jsQR(imageData.data, imageData.width, imageData.height);
-								if (code && code.data) {
-									setScannedData(code.data);
-									setScanning(false);
-
-									if (code.data === TARGET_QR) {
+					// Try using native detector first if available
+					if (detectorRef.current) {
+						try {
+							const detections = await detectorRef.current.detect(video);
+							if (detections && detections.length > 0) {
+								const value = detections[0].rawValue || detections[0].data || '';
+								if (value) {
+									setScannedData(value);
+									
+									if (value === TARGET_QR) {
 										alert('QR matched expected referrer code.');
 									} else {
-										alert(`Scanned QR: ${code.data}`);
+										alert(`Scanned QR: ${value}`);
 									}
 
 									stopScanner();
 									return;
 								}
 							}
+						} catch (detectorError) {
+							console.log('Native detector failed, falling back to jsQR');
+						}
+					}
+
+					// Fallback to jsQR
+					if (ctx && video.videoWidth && video.videoHeight) {
+						canvas.width = video.videoWidth;
+						canvas.height = video.videoHeight;
+						ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+						const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+						
+						const code = jsQR(imageData.data, imageData.width, imageData.height);
+						if (code && code.data) {
+							setScannedData(code.data);
+							
+							if (code.data === TARGET_QR) {
+								alert('QR matched expected referrer code.');
+							} else {
+								alert(`Scanned QR: ${code.data}`);
+							}
+
+							stopScanner();
+							return;
 						}
 					}
 				} catch (e) {
 					console.error('Error during QR detection loop', e);
 				}
 
-				animationRef.current = requestAnimationFrame(detectFrame);
+				// Continue scanning
+				if (scanning) {
+					animationRef.current = requestAnimationFrame(detectFrame);
+				}
 			};
 
 			// start detection loop
@@ -265,21 +278,29 @@ export default function QRScannerPage() {
 
 						{scanning && (
 							<div className="space-y-6">
-								<div className="w-64 h-64 mx-auto bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center border-2 border-dashed border-blue-300 dark:border-blue-600 relative overflow-hidden">
+								<div className="w-80 h-80 mx-auto bg-black rounded-xl relative overflow-hidden border-2 border-blue-300 dark:border-blue-600">
 									{/* video preview */}
 									<video
 										ref={videoRef}
-										className="w-full h-full object-cover"
+										className="w-full h-full object-cover rounded-xl"
 										playsInline
 										muted
+										autoPlay
 									/>
-									{/* transparent overlay and status */}
-									<div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-										<div className="text-center">
-											<div className="text-4xl mb-2">🔍</div>
-											<p className="text-blue-500 dark:text-blue-400 text-sm">Scanning...</p>
+									{/* Scanning overlay - only corners visible */}
+									<div className="absolute inset-4 pointer-events-none">
+										{/* Corner indicators */}
+										<div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-blue-400"></div>
+										<div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-blue-400"></div>
+										<div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-blue-400"></div>
+										<div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-blue-400"></div>
+									</div>
+									{/* Status indicator at bottom */}
+									<div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
+										<div className="bg-black/70 text-white px-3 py-1 rounded-full text-sm flex items-center">
+											<div className="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+											Scanning...
 										</div>
-										<div className="absolute inset-4 border-2 border-blue-500 rounded-lg animate-pulse"></div>
 									</div>
 								</div>
 
@@ -290,6 +311,13 @@ export default function QRScannerPage() {
 									<div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-3"></div>
 									<p className="text-gray-600 dark:text-gray-400">Looking for QR code...</p>
 								</div>
+								
+								<button
+									onClick={stopScanner}
+									className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium"
+								>
+									Stop Scanning
+								</button>
 							</div>
 						)}
 
