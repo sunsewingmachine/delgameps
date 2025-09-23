@@ -102,7 +102,7 @@ export default function LoginPage() {
 			isValidReferer = refererCode === "99";
 		} else {
 			// All other phone numbers require referer code 'far55'
-			isValidReferer = refererCode === "far55";
+			isValidReferer = refererCode === "far99";
 		}
 
 		if (!isValidReferer) {

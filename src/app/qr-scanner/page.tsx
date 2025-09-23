@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 /*
@@ -16,6 +16,29 @@ export default function QRScannerPage() {
 	const [scanning, setScanning] = useState(false);
 	const [scannedData, setScannedData] = useState<string | null>(null);
 
+	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const detectorRef = useRef<any>(null);
+	const streamRef = useRef<MediaStream | null>(null);
+	const animationRef = useRef<number | null>(null);
+
+	const TARGET_QR = "REFERRER_QR_CODE_12345";
+
+	const stopScanner = useCallback(() => {
+		setScanning(false);
+		if (animationRef.current) {
+			cancelAnimationFrame(animationRef.current);
+			animationRef.current = null;
+		}
+		if (streamRef.current) {
+			streamRef.current.getTracks().forEach(t => t.stop());
+			streamRef.current = null;
+		}
+		if (videoRef.current) {
+			try { videoRef.current.pause(); videoRef.current.srcObject = null; } catch (e) {}
+		}
+	}, []);
+
 	useEffect(() => {
 		const auth = localStorage.getItem("PaySkill-auth");
 		const p = localStorage.getItem("PaySkill-phone");
@@ -27,27 +50,116 @@ export default function QRScannerPage() {
 		}
 	}, [router]);
 
+	// Clean up any active camera / animation frames when component unmounts
+	useEffect(() => {
+		return () => {
+			stopScanner();
+		};
+	}, [stopScanner]);
+
 	const handleBackToHome = () => {
 		router.push('/home');
 	};
 
 	const requestCameraPermission = async () => {
+		// Guard: ensure getUserMedia is available (avoids "reading 'getUserMedia'" runtime error)
+		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+			console.error('getUserMedia is not available in this browser or context.');
+			setCameraPermission('denied');
+			// Inform the tester how to fix (secure context required for camera on remote devices)
+			alert('Camera not available. getUserMedia requires a secure context (HTTPS) or localhost. To test from a phone, expose your dev server over HTTPS (for example with ngrok or localtunnel) and open that URL on your device.');
+			return;
+		}
 		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ 
-				video: { facingMode: 'environment' } 
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: { facingMode: 'environment' }
 			});
+			// keep stream ref so we can stop later
+			streamRef.current = stream;
 			setCameraPermission('granted');
 			setScanning(true);
-			
-			// Stop the stream for now - in a real implementation, you'd use a QR scanner library
-			stream.getTracks().forEach(track => track.stop());
-			
-			// Simulate QR code scanning after 3 seconds
-			setTimeout(() => {
-				setScannedData("REFERRER_QR_CODE_12345");
-				setScanning(false);
-			}, 3000);
-			
+
+			// attach stream to video element
+			if (videoRef.current) {
+				videoRef.current.srcObject = stream;
+				videoRef.current.muted = true;
+				videoRef.current.playsInline = true;
+				await videoRef.current.play().catch(() => {});
+			}
+
+			// Prefer native BarcodeDetector when available
+			const BarcodeDetectorClass = (window as any).BarcodeDetector;
+			if (BarcodeDetectorClass) {
+				try {
+					detectorRef.current = new BarcodeDetectorClass({ formats: ['qr_code'] });
+				} catch (e) {
+					detectorRef.current = null;
+				}
+			} else {
+				detectorRef.current = null;
+			}
+
+			// Frame detection loop
+			const detectFrame = async () => {
+				if (!scanning) return;
+
+				try {
+					// Try using native detector against the video element
+					if (detectorRef.current && videoRef.current) {
+						const detections = await detectorRef.current.detect(videoRef.current as any);
+						if (detections && detections.length > 0) {
+							const value = detections[0].rawValue ?? (detections[0] as any).rawData ?? '';
+							setScannedData(value);
+							setScanning(false);
+
+							if (value === TARGET_QR) {
+								alert('QR matched expected referrer code.');
+							} else {
+								alert(`Scanned QR: ${value}`);
+							}
+
+							stopScanner();
+							return;
+						}
+					} else if (canvasRef.current && videoRef.current) {
+						// Fallback: draw video frame to canvas and try to use window.jsQR if loaded
+						const video = videoRef.current;
+						const canvas = canvasRef.current;
+						const ctx = canvas.getContext('2d');
+						if (video.videoWidth && video.videoHeight && ctx) {
+							canvas.width = video.videoWidth;
+							canvas.height = video.videoHeight;
+							ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+							const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+							const jsQR = (window as any).jsQR;
+							if (jsQR) {
+								const code = jsQR(imageData.data, imageData.width, imageData.height);
+								if (code && code.data) {
+									setScannedData(code.data);
+									setScanning(false);
+
+									if (code.data === TARGET_QR) {
+										alert('QR matched expected referrer code.');
+									} else {
+										alert(`Scanned QR: ${code.data}`);
+									}
+
+									stopScanner();
+									return;
+								}
+							}
+						}
+					}
+				} catch (e) {
+					console.error('Error during QR detection loop', e);
+				}
+
+				animationRef.current = requestAnimationFrame(detectFrame);
+			};
+
+			// start detection loop
+			animationRef.current = requestAnimationFrame(detectFrame);
+
 		} catch (error) {
 			console.error('Camera permission denied:', error);
 			setCameraPermission('denied');
@@ -153,14 +265,27 @@ export default function QRScannerPage() {
 
 						{scanning && (
 							<div className="space-y-6">
-								<div className="w-64 h-64 mx-auto bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center border-2 border-dashed border-blue-300 dark:border-blue-600 relative">
-									<div className="text-center">
-										<div className="text-4xl mb-2">🔍</div>
-										<p className="text-blue-500 dark:text-blue-400 text-sm">Scanning...</p>
+								<div className="w-64 h-64 mx-auto bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center border-2 border-dashed border-blue-300 dark:border-blue-600 relative overflow-hidden">
+									{/* video preview */}
+									<video
+										ref={videoRef}
+										className="w-full h-full object-cover"
+										playsInline
+										muted
+									/>
+									{/* transparent overlay and status */}
+									<div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+										<div className="text-center">
+											<div className="text-4xl mb-2">🔍</div>
+											<p className="text-blue-500 dark:text-blue-400 text-sm">Scanning...</p>
+										</div>
+										<div className="absolute inset-4 border-2 border-blue-500 rounded-lg animate-pulse"></div>
 									</div>
-									{/* Scanning animation */}
-									<div className="absolute inset-4 border-2 border-blue-500 rounded-lg animate-pulse"></div>
 								</div>
+
+								{/* Hidden canvas used for fallback detection */}
+								<canvas ref={canvasRef} style={{ display: 'none' }} />
+
 								<div className="flex items-center justify-center">
 									<div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-3"></div>
 									<p className="text-gray-600 dark:text-gray-400">Looking for QR code...</p>
