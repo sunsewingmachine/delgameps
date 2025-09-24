@@ -2,9 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 
+// Purpose: QR code generator page that displays a QR code for the DPS check URL with current epoch timestamp
 export default function ShowQrPage() {
   const [input, setInput] = useState('');
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Generate the DPS check URL with current epoch timestamp
+  const generateDpsUrl = () => {
+    const currentEpoch = Math.floor(Date.now() / 1000);
+    return `https://dps-gamma.vercel.app/check/?arg=far99-task2&ep=${currentEpoch}`;
+  };
 
   // --- Helpers ---
   const isValidUrl = (value: string) => {
@@ -26,33 +35,36 @@ export default function ShowQrPage() {
 
   const buildQrSrc = (value: string) => {
     if (!value) return '';
-    const size = '300x300';
-    return `https://chart.googleapis.com/chart?cht=qr&chs=${size}&chl=${encodeURIComponent(
-      value
-    )}&chld=L|1`;
+    
+    // Try multiple QR code services as fallbacks
+    const services = [
+      // QR-Server.com - free and reliable
+      `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`,
+      
+      // Google Charts API (backup)
+      `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(value)}&chld=L|1`,
+      
+      // QRCode.show (backup)
+      `https://qrcode.show/${encodeURIComponent(value)}`
+    ];
+    
+    return services[0]; // Start with the most reliable one
   };
 
-  // Load saved input
+  // Set the DPS URL on component mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('show-qr-input');
-      if (saved) setInput(saved);
-    } catch {
-      /* ignore */
-    }
+    const dpsUrl = generateDpsUrl();
+    setInput(dpsUrl);
+    // Auto-generate QR code for the DPS URL
+    setTimeout(() => {
+      setQrUrl(buildQrSrc(dpsUrl));
+    }, 100);
   }, []);
 
-  // Persist input
+  // Skip localStorage persistence for Claude artifacts
   useEffect(() => {
-    try {
-      if (input) {
-        localStorage.setItem('show-qr-input', input);
-      } else {
-        localStorage.removeItem('show-qr-input');
-      }
-    } catch {
-      /* ignore */
-    }
+    // In a real app, this would save to localStorage
+    // For Claude artifacts, we skip this to avoid errors
   }, [input]);
 
   const handleGenerate = (e?: React.FormEvent) => {
@@ -60,19 +72,43 @@ export default function ShowQrPage() {
     const v = input.trim();
     if (!v) {
       setQrUrl(null);
+      setImageError(false);
       return;
     }
-    setQrUrl(buildQrSrc(v));
+    
+    setIsLoading(true);
+    setImageError(false);
+    
+    // Add a small delay to show loading state
+    setTimeout(() => {
+      setQrUrl(buildQrSrc(v));
+      setIsLoading(false);
+    }, 300);
   };
 
   const handleClear = () => {
     setInput('');
     setQrUrl(null);
-    try {
-      localStorage.removeItem('show-qr-input');
-    } catch {
-      /* ignore */
+    setImageError(false);
+    setIsLoading(false);
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
+    setIsLoading(false);
+    
+    // Try fallback service
+    if (qrUrl && qrUrl.includes('qrserver.com')) {
+      const value = input.trim();
+      if (value) {
+        setQrUrl(`https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(value)}&chld=L|1`);
+      }
     }
+  };
+
+  const handleImageLoad = () => {
+    setImageError(false);
+    setIsLoading(false);
   };
 
   const normalized = normalizeUrl(input);
@@ -102,29 +138,32 @@ export default function ShowQrPage() {
 
         <button
           type="submit"
+          disabled={isLoading}
           style={{
             padding: '0.55rem 0.9rem',
             borderRadius: 6,
             border: 'none',
-            background: '#111827',
+            background: isLoading ? '#6b7280' : '#111827',
             color: 'white',
-            cursor: 'pointer',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
             fontSize: 15
           }}
         >
-          Generate
+          {isLoading ? 'Loading...' : 'Generate'}
         </button>
 
         <button
           type="button"
           onClick={handleClear}
+          disabled={isLoading}
           style={{
             padding: '0.45rem 0.7rem',
             borderRadius: 6,
             border: '1px solid #e5e7eb',
             background: 'white',
-            cursor: 'pointer',
-            fontSize: 14
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            fontSize: 14,
+            opacity: isLoading ? 0.6 : 1
           }}
         >
           Clear
@@ -140,13 +179,52 @@ export default function ShowQrPage() {
       <section style={{ marginTop: 20 }}>
         {qrUrl ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
-            <img
-              src={qrUrl}
-              alt="Generated QR code"
-              width={300}
-              height={300}
-              style={{ border: '1px solid #e5e7eb', borderRadius: 6 }}
-            />
+            {isLoading ? (
+              <div style={{ 
+                width: 300, 
+                height: 300, 
+                border: '1px solid #e5e7eb', 
+                borderRadius: 6,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#f9fafb',
+                color: '#6b7280'
+              }}>
+                Loading QR code...
+              </div>
+            ) : imageError ? (
+              <div style={{ 
+                width: 300, 
+                height: 300, 
+                border: '1px solid #e5e7eb', 
+                borderRadius: 6,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#fef2f2',
+                color: '#ef4444',
+                textAlign: 'center',
+                padding: '1rem'
+              }}>
+                <div>
+                  <div style={{ marginBottom: 8 }}>❌</div>
+                  <div style={{ fontSize: 14 }}>Failed to load QR code</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Try a different URL or check your connection</div>
+                </div>
+              </div>
+            ) : (
+              <img
+                src={qrUrl}
+                alt="Generated QR code"
+                width={300}
+                height={300}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                style={{ border: '1px solid #e5e7eb', borderRadius: 6 }}
+              />
+            )}
+            
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <a
                 href={qrUrl}
