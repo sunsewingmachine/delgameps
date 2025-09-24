@@ -6,16 +6,43 @@ export default function ShowQrPage() {
   const [input, setInput] = useState('');
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
-  // Persist input to localStorage so it survives reloads
+  // --- Helpers ---
+  const isValidUrl = (value: string) => {
+    try {
+      const u = new URL(value);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const normalizeUrl = (value: string) => {
+    const v = value.trim();
+    if (!v) return v;
+    if (/^https?:\/\//i.test(v)) return v;
+    if (/^[\w-]+(\.[\w-]+)+/.test(v)) return `https://${v}`;
+    return v;
+  };
+
+  const buildQrSrc = (value: string) => {
+    if (!value) return '';
+    const size = '300x300';
+    return `https://chart.googleapis.com/chart?cht=qr&chs=${size}&chl=${encodeURIComponent(
+      value
+    )}&chld=L|1`;
+  };
+
+  // Load saved input
   useEffect(() => {
     try {
       const saved = localStorage.getItem('show-qr-input');
       if (saved) setInput(saved);
-    } catch (e) {
-      // ignore (e.g. running in an environment without localStorage)
+    } catch {
+      /* ignore */
     }
   }, []);
 
+  // Persist input
   useEffect(() => {
     try {
       if (input) {
@@ -23,28 +50,19 @@ export default function ShowQrPage() {
       } else {
         localStorage.removeItem('show-qr-input');
       }
-    } catch (e) {
-      // ignore
+    } catch {
+      /* ignore */
     }
   }, [input]);
 
-  // Build QR image src using Google Charts API (no extra dependency required)
-  const buildQrSrc = (value: string) => {
-    if (!value) return '';
-    // size 300x300, can be changed
-    const size = '300x300';
-    return `https://chart.googleapis.com/chart?cht=qr&chs=${size}&chl=${encodeURIComponent(
-      value
-    )}&chld=L|1`;
-  };
-
   const handleGenerate = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!input) {
+    const v = input.trim();
+    if (!v) {
       setQrUrl(null);
       return;
     }
-    setQrUrl(buildQrSrc(input.trim()));
+    setQrUrl(buildQrSrc(v));
   };
 
   const handleClear = () => {
@@ -52,16 +70,22 @@ export default function ShowQrPage() {
     setQrUrl(null);
     try {
       localStorage.removeItem('show-qr-input');
-    } catch (e) {
-      // ignore
+    } catch {
+      /* ignore */
     }
   };
+
+  const normalized = normalizeUrl(input);
+  const canOpen = isValidUrl(normalized);
 
   return (
     <main style={{ maxWidth: 800, margin: '2rem auto', padding: '1rem' }}>
       <h1 style={{ marginBottom: '1rem' }}>Show QR</h1>
 
-      <form onSubmit={handleGenerate} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+      <form
+        onSubmit={handleGenerate}
+        style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}
+      >
         <input
           aria-label="URL or text to encode"
           placeholder="Enter URL (e.g. https://example.com) or any text..."
@@ -138,20 +162,23 @@ export default function ShowQrPage() {
               >
                 Open QR image
               </a>
-              <a
-                href={input.startsWith('http') ? input : `https://${input}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  padding: '0.45rem 0.8rem',
-                  background: '#111827',
-                  color: 'white',
-                  borderRadius: 6,
-                  textDecoration: 'none'
-                }}
-              >
-                Open URL
-              </a>
+
+              {canOpen && (
+                <a
+                  href={normalized}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '0.45rem 0.8rem',
+                    background: '#111827',
+                    color: 'white',
+                    borderRadius: 6,
+                    textDecoration: 'none'
+                  }}
+                >
+                  Open URL
+                </a>
+              )}
             </div>
           </div>
         ) : (
