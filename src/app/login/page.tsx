@@ -211,7 +211,6 @@ export default function LoginPage() {
 					</div>
 				</div>
 			</div>
-			<div className="text-center opacity-50 text-slate-700 text-xs">V1.4.306</div>
 		</div>
 	);
 }
