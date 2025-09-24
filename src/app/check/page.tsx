@@ -1,15 +1,20 @@
-'use client';
-
 import React from 'react';
-import { useSearchParams } from 'next/navigation';
 
-export default function CheckPage() {
-  const params = useSearchParams();
-  const arg = params?.get('arg') ?? '';
+export const dynamic = 'force-dynamic';
+
+function getParamValue(searchParams: any, key: string) {
+  const v = searchParams?.[key];
+  if (Array.isArray(v)) return v[0] ?? '';
+  return (v ?? '') as string;
+}
+
+export default function CheckPage({ searchParams }: any) {
+  const params = searchParams ?? {};
+  const arg = getParamValue(params, 'arg') ?? '';
   const expected = 'far99-task2';
   const matches = arg === expected;
 
-  const ep = params?.get('ep') ?? '';
+  const ep = getParamValue(params, 'ep') ?? '';
   let epValid = false;
   let epMillis: number | null = null;
   let epDate: Date | null = null;
@@ -24,13 +29,13 @@ export default function CheckPage() {
       epDate = new Date(epMillis);
       epValid = !isNaN(epDate.getTime());
 
-  if (epValid) {
-    const now = new Date();
-    const startHour = new Date(now);
-    startHour.setMinutes(0, 0, 0);
-    const endHour = new Date(startHour.getTime() + 60 * 60 * 1000 - 1);
-    isCurrentHour = epMillis >= startHour.getTime() && epMillis <= endHour.getTime();
-  }
+      if (epValid) {
+        const now = new Date();
+        const startHour = new Date(now);
+        startHour.setMinutes(0, 0, 0);
+        const endHour = new Date(startHour.getTime() + 60 * 60 * 1000 - 1);
+        isCurrentHour = epMillis >= startHour.getTime() && epMillis <= endHour.getTime();
+      }
     }
   }
 
