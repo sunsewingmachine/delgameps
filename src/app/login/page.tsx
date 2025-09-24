@@ -177,7 +177,7 @@ export default function LoginPage() {
 								</div>
 								<div className="relative">
 									<input
-										type="text"
+										type="password"
 										value={referer}
 										onChange={(e) => handleRefererChange(e.target.value)}
 										placeholder="Enter referer code"
