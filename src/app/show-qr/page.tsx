@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { getUserPhone } from '../../lib/userUtils';
 
-// Purpose: Elegant QR code generator page that displays a QR code for the DPS check URL with current epoch timestamp.
-// This file now includes an access guard that only allows the user whose phone is 9842470497 to view the page.
-// Unauthorized users see an empty page and are sent back to the previous page automatically.
+// Purpose: QR code generator page that displays a DPS check QR only for a specific phone (9842470497).
+// If unauthorized, the page renders nothing and returns the user to the previous page.
 export default function ShowQrPage() {
   const [input, setInput] = useState("");
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -94,26 +93,23 @@ export default function ShowQrPage() {
     }
   }, []);
 
-  // If we haven't determined auth yet, render nothing to avoid flicker.
-  if (authorized === null) {
-    return null;
-  }
-
-  // If not authorized, render empty page (navigation already triggered in useEffect)
-  if (authorized === false) {
-    return null;
-  }
-
-  // Set the DPS URL on component mount (only for authorized users)
+  // Set the DPS URL on component mount — declares the hook unconditionally,
+  // but only runs its logic when authorized === true (keeps hooks order stable).
   useEffect(() => {
+    if (!authorized) return;
+
     const dpsUrl = generateDpsUrl();
     setInput(dpsUrl);
     // Auto-generate QR code for the DPS URL with animation delay
-    setTimeout(() => {
+    const t1 = setTimeout(() => {
       setQrUrl(buildQrSrc(dpsUrl));
-      setTimeout(() => setShowQr(true), 100);
+      const t2 = setTimeout(() => setShowQr(true), 100);
+      // clear t2 on cleanup
+      return () => clearTimeout(t2);
     }, 200);
-  }, []);
+
+    return () => clearTimeout(t1);
+  }, [authorized]);
 
   // Skip localStorage persistence for Claude artifacts
   useEffect(() => {
@@ -171,6 +167,16 @@ export default function ShowQrPage() {
 
   const normalized = normalizeUrl(input);
   const canOpen = isValidUrl(normalized);
+
+  // If we haven't determined auth yet, render nothing to avoid flicker.
+  if (authorized === null) {
+    return null;
+  }
+
+  // If not authorized, render empty page (navigation already triggered in useEffect)
+  if (authorized === false) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
