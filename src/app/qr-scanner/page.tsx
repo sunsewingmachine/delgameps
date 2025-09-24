@@ -5,7 +5,6 @@ import jsQR from "jsqr";
 
 import Header from "./Header";
 import ScannerArea from "./ScannerArea";
-import ScannedResult from "./ScannedResult";
 import Tips from "./Tips";
 
 type CamPerm = "granted" | "denied" | "prompt";
@@ -174,11 +173,10 @@ export default function QRScannerPage() {
             if (detections?.length) {
               const value = detections[0].rawValue || detections[0].data || "";
               if (value) {
-                setScannedData(value);
-                alert(value === TARGET_QR ? "QR matched expected referrer code." : `Scanned QR: ${value}`);
+                // stop camera and navigate: if value is a URL, navigate to it; otherwise go to home
                 stopScanner();
-                // if the scanned value is a URL, navigate to it
                 if (navigateIfUrl(value)) return;
+                router.push("/home");
                 return;
               }
             }
@@ -197,11 +195,10 @@ export default function QRScannerPage() {
           const code = jsQR(img.data, img.width, img.height);
           if (code?.data) {
             const value = code.data;
-            setScannedData(value);
-            alert(value === TARGET_QR ? "QR matched expected referrer code." : `Scanned QR: ${value}`);
+            // stop camera and navigate: if value is a URL, navigate to it; otherwise go to home
             stopScanner();
-            // if the scanned value is a URL, navigate to it
             if (navigateIfUrl(value)) return;
+            router.push("/home");
             return;
           }
         }
@@ -259,11 +256,7 @@ export default function QRScannerPage() {
                 stopScanner={stopScanner}
               />
 
-              {scannedData && (
-                <div className="mt-6">
-                  <ScannedResult scannedData={scannedData} onComplete={handleScanComplete} />
-                </div>
-              )}
+              
             </div>
           </div>
         </div>
