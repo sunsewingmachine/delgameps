@@ -1,115 +1,195 @@
-import React from 'react';
+"use client";
+import React, { useEffect, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
-export const dynamic = 'force-dynamic';
+/*
+Purpose:
+Client-side page to validate query args. Checks that `arg` matches the expected
+value and that `ep` (epoch) falls within the current hour. Shows a valid-action
+panel with a button when checks pass. If validation fails, displays "Invalid"
+and returns to the previous page after 3 seconds.
 
-function getParamValue(searchParams: any, key: string) {
-  const v = searchParams?.[key];
-  if (Array.isArray(v)) return v[0] ?? '';
-  return (v ?? '') as string;
+Styling: Updated to match the Home page colors, background and card styles.
+*/
+
+function parseEpochToMillis(raw: string) {
+	const cleaned = raw?.trim();
+	if (!cleaned || !/^\d+$/.test(cleaned)) return { ok: false, millis: null, date: null };
+
+	const num = Number(cleaned);
+	const millis = cleaned.length >= 13 || num > 1e12 ? num : num * 1000;
+	const date = new Date(millis);
+	if (isNaN(date.getTime())) return { ok: false, millis: null, date: null };
+	return { ok: true, millis, date };
 }
 
-export default function CheckPage({ searchParams }: any) {
-  const params = searchParams ?? {};
-  const arg = getParamValue(params, 'arg') ?? '';
-  const expected = 'far99-task2';
-  const matches = arg === expected;
+export default function CheckPage() {
+	const searchParams = useSearchParams();
+	const router = useRouter();
 
-  const ep = getParamValue(params, 'ep') ?? '';
-  let epValid = false;
-  let epMillis: number | null = null;
-  let epDate: Date | null = null;
-  let isCurrentHour = false;
+	const arg = searchParams?.get("arg") ?? "";
+	const ep = searchParams?.get("ep") ?? "";
 
-  if (ep) {
-    const cleaned = ep.trim();
-    if (/^\d+$/.test(cleaned)) {
-      const num = Number(cleaned);
-      // If epoch looks like milliseconds (13+ digits or >1e12), use as ms, otherwise seconds
-      epMillis = cleaned.length >= 13 || num > 1e12 ? num : num * 1000;
-      epDate = new Date(epMillis);
-      epValid = !isNaN(epDate.getTime());
+	const expected = "far99-task2";
+	const matches = arg === expected;
 
-      if (epValid) {
-        const now = new Date();
-        const startHour = new Date(now);
-        startHour.setMinutes(0, 0, 0);
-        const endHour = new Date(startHour.getTime() + 60 * 60 * 1000 - 1);
-        isCurrentHour = epMillis >= startHour.getTime() && epMillis <= endHour.getTime();
-      }
-    }
-  }
+	const { ok: epValid, millis: epMillis, date: epDate } = parseEpochToMillis(ep);
 
-  return (
-    <main style={{ padding: '2rem', fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial' }}>
-      <h1>Check Query Argument</h1>
+	const isCurrentHour = useMemo(() => {
+		if (!epValid || !epMillis) return false;
+		const now = new Date();
+		const startHour = new Date(now);
+		startHour.setMinutes(0, 0, 0);
+		const endHour = new Date(startHour.getTime() + 60 * 60 * 1000 - 1);
+		return epMillis >= startHour.getTime() && epMillis <= endHour.getTime();
+	}, [epValid, epMillis]);
 
-      {arg ? (
-        <div>
-          {matches ? (
-            <p style={{ color: 'green', fontWeight: 600 }}>
-              Argument detected: <code>{arg}</code> — it matches the expected value.
-            </p>
-          ) : (
-            <p style={{ color: '#b34747', fontWeight: 600 }}>
-              Argument provided: <code>{arg}</code> — does not match expected value <code>{expected}</code>.
-            </p>
-          )}
+	const allGood = matches && epValid && isCurrentHour;
 
-          <div style={{ marginTop: '1rem' }}>
-            <strong>Raw query:</strong>
-            <pre style={{ background: '#f4f4f4', padding: '0.5rem', borderRadius: 4 }}>{`?arg=${arg}${ep ? `&ep=${ep}` : ''}`}</pre>
-          </div>
-        </div>
-      ) : (
-        <p>
-          No <code>arg</code> query parameter provided. Try visiting <code>/check/?arg=far99-task2</code>
-        </p>
-      )}
+	useEffect(() => {
+		if (!allGood) {
+			// If anything is missing/wrong, redirect to Home page after 3 seconds.
+			const t = setTimeout(() => {
+				// Prefer router.push(); fallback to window.location for safety
+				try {
+					router.push("/home");
+				} catch (e) {
+					if (typeof window !== "undefined") window.location.href = "/home";
+				}
+			}, 3000);
+			return () => clearTimeout(t);
+		}
+		return;
+	}, [allGood, router]);
 
-      <hr style={{ margin: '1.5rem 0' }} />
+	return (
+		<div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 overflow-y-auto">
+			{/* Header (matching home page style) */}
+			<div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div className="flex justify-between items-center py-4">
+						<div className="flex items-center space-x-3">
+							<div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+								<span className="text-white font-bold text-lg">P</span>
+							</div>
+							<div>
+								<h1 className="text-2xl font-bold text-gray-900 dark:text-white">PaySkill — Check</h1>
+								<p className="text-sm text-gray-600 dark:text-gray-400">Validation page for special links</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 
-      <h2>Epoch ("ep") check</h2>
-      {ep ? (
-        <div>
-          {!epValid ? (
-            <p style={{ color: '#b34747' }}>
-              Provided <code>ep</code> is invalid. Please pass a numeric epoch (seconds or milliseconds).
-            </p>
-          ) : (
-            <div>
-              <p>
-                <strong>Epoch value:</strong> <code>{ep}</code>
-              </p>
+			{/* Main Content */}
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+				<div className="text-center mb-8">
+					<h2 className="text-3xl font-bold text-gray-900 dark:text-white">Loading Your Skill...</h2>
+					<p className="text-gray-600 dark:text-gray-300 mt-2">
+						Checking the QR of Referer and loading your skill task...
+					</p>
+				</div>
 
-              <p>
-                <strong>Interpreted time:</strong>{' '}
-                <code>{epDate ? epDate.toLocaleString() : 'Invalid date'}</code>
-              </p>
+				<section className="max-w-3xl mx-auto">
+					<div className="mb-6 hidden">
+						<strong className="text-sm text-gray-700 dark:text-gray-300">Raw query</strong>
+						<pre className="mt-2 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 text-left break-words">
+							{`?arg=${arg}${ep ? `&ep=${ep}` : ""}`}
+						</pre>
+					</div>
 
-              {isCurrentHour ? (
-                <p style={{ color: 'green', fontWeight: 600 }}>
-                  The epoch is within the current hour.
-                </p>
-              ) : (
-                <p style={{ color: '#b34747', fontWeight: 600 }}>
-                  The epoch is NOT within the current hour.
-                </p>
-              )}
+					{allGood ? (
+						<div
+							id="divValidEpochAction"
+							className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-2 border-green-300 dark:border-green-600">
+							<p className="text-lg text-gray-900 dark:text-slate-300">Referer: Valid</p>
 
-              <div style={{ marginTop: '0.75rem', background: '#f6f8fa', padding: '0.6rem', borderRadius: 4 }}>
-                <small>
-                  Current local time: <code>{new Date().toLocaleString()}</code>
-                </small>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <p>
-          No <code>ep</code> query parameter provided. Example: <code>/check/?ep=1700000000</code> (seconds) or{' '}
-          <code>/check/?ep=1700000000000</code> (milliseconds).
-        </p>
-      )}
-    </main>
-  );
+							<p className="mt-3 text-xl font-semibold text-gray-600 dark:text-green-400">
+								Your Next Task: Arm Wrestling
+							</p>
+
+							<div className="mt-10">
+								<p>Rules</p>
+								<div>
+									<strong>Start:</strong> Elbows on pad, hands gripped, wrists straight.
+								</div>
+								<div>
+									<strong>Go:</strong> Begin only at referee’s signal.
+								</div>
+								<div>
+									<strong>Win:</strong> Pin opponent’s hand to pad.
+								</div>
+								<div>
+									<strong>Fouls:</strong> Elbow lift, false start, two-hand use, illegal lean.
+								</div>
+								<div>
+									<strong>Fair Play:</strong> No wrist twists; follow referee.
+								</div>
+							</div>
+
+							<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 hidden">
+								Interpreted time:{" "}
+								<code className="bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded">
+									{epDate?.toLocaleString() ?? "Invalid date"}
+								</code>
+							</p>
+
+							<div className="mt-6">
+								<button
+									id="buttonProceedFromEpoch"
+									onClick={() => {
+										try {
+											// Navigate to the Home page
+											router.push("/home");
+										} catch {
+											// Fallback in case router isn't available (unexpected)
+											if (typeof window !== "undefined") window.location.href = "/home";
+										}
+									}}
+									className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">
+									I've Completed
+								</button>
+							</div>
+						</div>
+					) : (
+						<div
+							id="divInvalid"
+							className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-2 border-red-200 dark:border-red-600">
+							<p className="text-lg font-bold text-red-600 dark:text-red-300">Invalid QR Code</p>
+
+							<ul className="hidden mt-3 list-disc list-inside text-gray-600 dark:text-gray-300">
+								{!arg && (
+									<li>
+										No <code>arg</code> provided.
+									</li>
+								)}
+								{arg && !matches && (
+									<li>
+										Provided <code>arg</code> does not match expected value <code>{expected}</code>.
+									</li>
+								)}
+								{!ep && (
+									<li>
+										No <code>ep</code> provided.
+									</li>
+								)}
+								{ep && !epValid && (
+									<li>
+										<code>ep</code> is not a valid numeric epoch (seconds or milliseconds).
+									</li>
+								)}
+								{ep && epValid && !isCurrentHour && (
+									<li>
+										<code>ep</code> is not within the current hour.
+									</li>
+								)}
+							</ul>
+
+							<p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Please scan a valid QR Code...</p>
+						</div>
+					)}
+				</section>
+			</div>
+		</div>
+	);
 }
