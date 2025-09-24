@@ -2,6 +2,8 @@
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Purpose: Handle scanned QR code results — display a confirmation UI and redirect to permitted URLs
+// (e.g., containing 'far99-task2' or 'arg=far99'). Keeps UX simple and avoids exposing scanned text.
 type Props = {
   scannedData: string;
   onComplete: () => void;
@@ -26,7 +28,7 @@ export default function ScannedResult({ scannedData, onComplete }: Props) {
   }, [scannedData, router]);
 
   const handleContinue = () => {
-    if (scannedData && scannedData.includes("far99-task2")) {
+    if (scannedData && (scannedData.includes("far99-task2") || scannedData.includes("arg=far99"))) {
       const url = /^https?:\/\//i.test(scannedData) ? scannedData : `https://${scannedData}`;
       window.location.href = url;
       return;
