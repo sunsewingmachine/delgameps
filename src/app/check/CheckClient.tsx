@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 /*
@@ -41,6 +41,19 @@ export default function CheckClient() {
 	}, [epValid, epMillis]);
 
 	const allGood = matches && epValid && isCurrentHour;
+
+	const [showValidDiv, setShowValidDiv] = useState(false);
+
+	useEffect(() => {
+		if (allGood) {
+			// When validation passes, show a loading state for 10s, then reveal the action panel.
+			setShowValidDiv(false);
+			const t = setTimeout(() => setShowValidDiv(true), 25000);
+			return () => clearTimeout(t);
+		}
+		// Ensure panel is hidden when validation isn't satisfied.
+		setShowValidDiv(false);
+	}, [allGood]);
 
 	useEffect(() => {
 		if (!allGood) {
@@ -95,58 +108,80 @@ export default function CheckClient() {
 					</div>
 
 					{allGood ? (
-						<div
-							id="divValidEpochAction"
-							className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-2 border-green-300 dark:border-green-600">
-							<p className="text-lg text-gray-900 dark:text-slate-300">Referer: Valid</p>
+						showValidDiv ? (
+							<div
+								id="divValidEpochAction"
+								className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-2 border-green-300 dark:border-green-600">
+								<p className="text-lg text-gray-900 dark:text-slate-300">Referer: Valid</p>
 
-							<p className="mt-3 text-xl font-semibold text-gray-600 dark:text-green-400">
-								Your Next Task: Arm Wrestling
-							</p>
+								<p className="mt-3 text-xl font-semibold text-gray-600 dark:text-green-400">
+									Your Next Task: Arm Wrestling
+								</p>
 
-							<div className="mt-10">
-								<p>Rules</p>
-								<div>
-									<strong>Start:</strong> Elbows on pad, hands gripped, wrists straight.
+								<div className="mt-10">
+									<p>Rules</p>
+									<div>
+										<strong>Start:</strong> Elbows on pad, hands gripped, wrists straight.
+									</div>
+									<div>
+										<strong>Go:</strong> Begin only at referee’s signal.
+									</div>
+									<div>
+										<strong>Win:</strong> Pin opponent’s hand to pad.
+									</div>
+									<div>
+										<strong>Fouls:</strong> Elbow lift, false start, two-hand use, illegal lean.
+									</div>
+									<div>
+										<strong>Fair Play:</strong> No wrist twists; follow referee.
+									</div>
 								</div>
-								<div>
-									<strong>Go:</strong> Begin only at referee’s signal.
-								</div>
-								<div>
-									<strong>Win:</strong> Pin opponent’s hand to pad.
-								</div>
-								<div>
-									<strong>Fouls:</strong> Elbow lift, false start, two-hand use, illegal lean.
-								</div>
-								<div>
-									<strong>Fair Play:</strong> No wrist twists; follow referee.
+
+								<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 hidden">
+									Interpreted time:{" "}
+									<code className="bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded">
+										{epDate?.toLocaleString() ?? "Invalid date"}
+									</code>
+								</p>
+
+								<div className="mt-6">
+									<button
+										id="buttonProceedFromEpoch"
+										onClick={() => {
+											try {
+												// Navigate to the Home page
+												router.push("/home");
+											} catch {
+												// Fallback in case router isn't available (unexpected)
+												if (typeof window !== "undefined") window.location.href = "/home";
+											}
+										}}
+										className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">
+										I've Completed
+									</button>
 								</div>
 							</div>
-
-							<p className="mt-3 text-sm text-gray-600 dark:text-gray-300 hidden">
-								Interpreted time:{" "}
-								<code className="bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded">
-									{epDate?.toLocaleString() ?? "Invalid date"}
-								</code>
-							</p>
-
-							<div className="mt-6">
-								<button
-									id="buttonProceedFromEpoch"
-									onClick={() => {
-										try {
-											// Navigate to the Home page
-											router.push("/home");
-										} catch {
-											// Fallback in case router isn't available (unexpected)
-											if (typeof window !== "undefined") window.location.href = "/home";
-										}
-									}}
-									className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">
-									I've Completed
-								</button>
+						) : (
+							<div id="divValidEpochActionLoading" className="flex items-center justify-center">
+								<div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-2 border-green-300 dark:border-green-600 flex flex-col items-center">
+									<svg
+										className="w-12 h-12 text-green-600 animate-spin"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24">
+										<circle
+											className="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											strokeWidth="4"></circle>
+										<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+									</svg>
+									<p className="mt-3 text-gray-600 dark:text-gray-300">Preparing your task...</p>
+								</div>
 							</div>
-						</div>
+						)
 					) : (
 						<div
 							id="divInvalid"
