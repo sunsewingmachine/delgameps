@@ -18,16 +18,16 @@ export default function LoginPage() {
 	// Cookie utility functions
 	const setCookie = (name: string, value: string, days: number = 30) => {
 		const expires = new Date();
-		expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+		expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
 		document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 	};
 
 	const getCookie = (name: string): string => {
 		const nameEQ = name + "=";
-		const ca = document.cookie.split(';');
+		const ca = document.cookie.split(";");
 		for (let i = 0; i < ca.length; i++) {
 			let c = ca[i];
-			while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+			while (c.charAt(0) === " ") c = c.substring(1, c.length);
 			if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
 		}
 		return "";
@@ -35,9 +35,9 @@ export default function LoginPage() {
 
 	// Load saved values from cookies on component mount
 	useEffect(() => {
-		const savedPhone = getCookie('payskill_last_phone');
-		const savedReferer = getCookie('payskill_last_referer');
-		
+		const savedPhone = getCookie("payskill_last_phone");
+		const savedReferer = getCookie("payskill_last_referer");
+
 		if (savedPhone) {
 			setPhone(savedPhone);
 		}
@@ -49,37 +49,37 @@ export default function LoginPage() {
 	// Save values to cookies whenever they change
 	const handlePhoneChange = (value: string) => {
 		setPhone(value);
-		setCookie('payskill_last_phone', value);
+		setCookie("payskill_last_phone", value);
 	};
 
 	const handleRefererChange = (value: string) => {
 		setReferer(value);
-		setCookie('payskill_last_referer', value);
+		setCookie("payskill_last_referer", value);
 	};
 
 	const logAttempt = async (phone: string, referer: string, result: string, reason?: string) => {
 		try {
-			await fetch('/api/auth/attempts', {
-				method: 'POST',
+			await fetch("/api/auth/attempts", {
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json',
+					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ 
-					phone: phone.trim(), 
+				body: JSON.stringify({
+					phone: phone.trim(),
 					referer: referer.trim(),
 					result,
-					reason
+					reason,
 				}),
 			});
 		} catch (error) {
-			console.error('Error logging attempt:', error);
+			console.error("Error logging attempt:", error);
 		}
 	};
 
 	const handleSubmit = async (e?: React.FormEvent) => {
 		e?.preventDefault();
 		setError(null);
-		
+
 		if (!phone.trim()) {
 			setError("Please enter a phone number.");
 			return;
@@ -107,16 +107,16 @@ export default function LoginPage() {
 
 		if (!isValidReferer) {
 			// Log failed attempt due to invalid referer
-			await logAttempt(phone, referer, 'failed', 'invalid_referer');
+			await logAttempt(phone, referer, "failed", "invalid_referer");
 			// Keep loading forever if referer is incorrect
 			return;
 		}
 
 		try {
-			const response = await fetch('/api/auth/login', {
-				method: 'POST',
+			const response = await fetch("/api/auth/login", {
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json',
+					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({ phone: phone.trim() }),
 			});
@@ -125,25 +125,25 @@ export default function LoginPage() {
 
 			if (data.success) {
 				// Log successful attempt
-				await logAttempt(phone, referer, 'success');
-				
+				await logAttempt(phone, referer, "success");
+
 				// Store authentication data
 				localStorage.setItem("PaySkill-auth", "true");
 				localStorage.setItem("PaySkill-phone", data.user.phone);
 				localStorage.setItem("PaySkill-user", JSON.stringify(data.user));
-				
+
 				// Navigate to home page
 				router.push("/home");
 			} else {
 				// Log failed attempt due to unauthorized phone
-				await logAttempt(phone, referer, 'failed', 'unauthorized_phone');
+				await logAttempt(phone, referer, "failed", "unauthorized_phone");
 				// Keep loading forever if phone number is not in allowed list
 				return;
 			}
 		} catch (error) {
-			console.error('Login error:', error);
+			console.error("Login error:", error);
 			// Log failed attempt due to network error
-			await logAttempt(phone, referer, 'failed', 'network_error');
+			await logAttempt(phone, referer, "failed", "network_error");
 			// Keep loading forever on network errors too
 			return;
 		}
@@ -211,6 +211,7 @@ export default function LoginPage() {
 					</div>
 				</div>
 			</div>
+			<div className="opacity-50 text-slate-700 text-xs">V1.4.305</div>
 		</div>
 	);
 }
