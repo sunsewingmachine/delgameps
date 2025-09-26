@@ -20,6 +20,12 @@ export default function HomePage() {
 	const [showPopup, setShowPopup] = useState(false);
 	const [showCompletedPopup, setShowCompletedPopup] = useState(false);
 
+	// Levels configuration loaded from public/levels.json.
+	// Purpose: Provide per-phone-number overrides for which tasks are completed,
+	// their display status text, and payment text (used to render Task cards).
+	type LevelInfo = { completed: boolean; status: string; payment: string };
+	const [levels, setLevels] = useState<Record<string, Record<string, LevelInfo>>>({});
+
 	useEffect(() => {
 		const auth = localStorage.getItem("PaySkill-auth");
 		const p = localStorage.getItem("PaySkill-phone");
@@ -32,6 +38,25 @@ export default function HomePage() {
 			router.replace("/login");
 		}
 	}, [router]);
+
+	// Load levels.json for user-specific level/status/payment info
+	const loadLevels = async () => {
+		try {
+			const res = await fetch('/levels.json');
+			if (res.ok) {
+				const data = await res.json();
+				setLevels(data);
+			}
+		} catch (err) {
+			console.error('Error loading levels.json', err);
+		}
+	};
+
+	useEffect(() => {
+		if (phone) {
+			loadLevels();
+		}
+	}, [phone]);
 
 	// Auto-complete Task 1 (Sign Up) when user first sees this page
 	useEffect(() => {
@@ -249,9 +274,16 @@ export default function HomePage() {
 				{/* Tasks Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 					{tasks.map((task, index) => {
-						const isCompleted = completedTasks.has(task.id);
 						const taskNumber = index + 1;
 						const isTask1 = index === 0; // Sign Up task
+						const taskKey = `task-${taskNumber}`;
+						const userLevels = (phone && levels[phone]) ? levels[phone] : (levels['default'] || {});
+						const levelInfo = userLevels[taskKey] || {
+							completed: completedTasks.has(task.id),
+							status: completedTasks.has(task.id) ? 'Completed' : 'Pending',
+							payment: (completedTasks.has(task.id) && isTask1) ? 'Allotted' : 'Pending'
+						};
+						const isCompleted = !!levelInfo.completed;
 						
 						return (
 							<div
@@ -284,21 +316,21 @@ export default function HomePage() {
 									<div className="flex justify-between items-center">
 										<span className="text-sm text-gray-600 dark:text-gray-400">Status:</span>
 										<span className={`text-sm font-medium ${
-											isCompleted 
+											levelInfo.completed 
 												? 'text-green-600 dark:text-green-400' 
 												: 'text-gray-500 dark:text-gray-500'
 										}`}>
-											{isCompleted ? 'Completed' : 'Pending'}
+											{levelInfo.status}
 										</span>
 									</div>
 									<div className="flex justify-between items-center">
 										<span className="text-sm text-gray-600 dark:text-gray-400">Payment:</span>
 										<span className={`text-sm font-medium ${
-											isCompleted && isTask1
+											levelInfo.payment && levelInfo.payment.toLowerCase() === 'allotted'
 												? 'text-green-600 dark:text-green-400'
 												: 'text-gray-500 dark:text-gray-500'
 										}`}>
-											{isCompleted && isTask1 ? 'Allotted' : 'Pending'}
+											{levelInfo.payment || 'Pending'}
 										</span>
 									</div>
 								</div>
@@ -317,7 +349,7 @@ export default function HomePage() {
 
 			{/* Task Locked Popup */}
 			{showPopup && (
-				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+				<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
 					<div className="bg-white dark:bg-gray-800 rounded-xl p-8 max-w-md mx-4 shadow-2xl">
 						<div className="text-center">
 							<div className="text-6xl mb-4">⚠️</div>

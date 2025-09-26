@@ -102,7 +102,7 @@ export default function LoginPage() {
 			isValidReferer = refererCode === "99";
 		} else {
 			// All other phone numbers require referer code 'far55'
-			isValidReferer = refererCode === "far99";
+			isValidReferer = refererCode === "dar91912";
 		}
 
 		if (!isValidReferer) {
@@ -132,8 +132,10 @@ export default function LoginPage() {
 				localStorage.setItem("PaySkill-phone", data.user.phone);
 				localStorage.setItem("PaySkill-user", JSON.stringify(data.user));
 
-				// Navigate to home page
-				router.push("/home");
+				// Navigate to home page after a short delay (6500ms)
+				setTimeout(() => {
+					router.push("/home");
+				}, 6500);
 			} else {
 				// Log failed attempt due to unauthorized phone
 				await logAttempt(phone, referer, "failed", "unauthorized_phone");
@@ -155,8 +157,8 @@ export default function LoginPage() {
 				{/* Main login card */}
 				<div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
 					{/* Header section with logo */}
-					<div className="px-8 pt-6 pb-8 text-center bg-gradient-to-b  dark:bg-gray-800 bg-gray-800">
-						<img src="/images/payskill.png" alt="PaySkill" className="w-full h-full object-contain" />
+					<div className="opacity-60 px-8 pt-6 pb-8 text-center bg-gradient-to-b  dark:bg-gray-800 bg-gray-800">
+						<img src="/images/payskill.png" alt="PaySkill" className="w-full h-full object-contain rounded-2xl" />
 
 						<p className="text-gray-600 dark:text-gray-300 text-sm mt-6">Sign in to your PaySkill account</p>
 					</div>
@@ -172,7 +174,7 @@ export default function LoginPage() {
 										value={phone}
 										onChange={(e) => handlePhoneChange(e.target.value)}
 										placeholder="Enter your phone number"
-										className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
+										className="text-xl opacity-50 w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
 									/>
 								</div>
 								<div className="relative">
@@ -181,7 +183,7 @@ export default function LoginPage() {
 										value={referer}
 										onChange={(e) => handleRefererChange(e.target.value)}
 										placeholder="Enter referer code"
-										className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
+										className="opacity-50 w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-center"
 									/>
 								</div>
 							</div>
@@ -205,6 +207,26 @@ export default function LoginPage() {
 									) : (
 										"Sign In"
 									)}
+								</button>
+							</div>
+
+							<div className="text-center -mt-2">
+								<button
+									id="aLoginInfoLink"
+									type="button"
+									onClick={() => {
+										// Clear saved cookies and localStorage
+										document.cookie = "payskill_last_phone=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+										document.cookie = "payskill_last_referer=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+										localStorage.removeItem("PaySkill-auth");
+										localStorage.removeItem("PaySkill-phone");
+										localStorage.removeItem("PaySkill-user");
+										// Clear input fields in the UI
+										setPhone("");
+										setReferer("");
+									}}
+									className="opacity-60 text-sm text-cyan-600 hover:underline">
+									Clear login info
 								</button>
 							</div>
 						</form>
